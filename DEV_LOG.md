@@ -59,3 +59,9 @@ LANGSMITH_PROJECT=langgraph-multi-agent-rag
 先初始化git仓库，提交第一次仓库：init: copy langgraph template as base
 feat: prepare project for faiss migration
 feat: add faiss retriever support
+学习git：本地版本管理，github是远程代码托管
+git init把当前文件夹变成Git仓库
+git add把改动放进准备提交区
+git commit生成一个版本快照
+git state看现在改了什么
+git log 看历史提交
