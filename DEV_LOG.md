@@ -39,8 +39,8 @@ __start__ → index_docs → __end__
 query_system_prompt给generate query节点用，把用户问题改写成检索友好的query
 response_system_prompt给respond query节点用，基于检索到的文档生成回答
 
-4.20
-# LangGraph Multi-Agent RAG System
+# 4.20学习记录 
+## LangGraph Multi-Agent RAG System
 
 基于 LangGraph 的多智能体复杂问答与检索优化系统（开发中）
 
@@ -75,8 +75,9 @@ git log 看历史提交
 InputState 是对外的窄接口，State 是内部完整状态。这种设计的好处是：外部调用者只需要传 messages，不需要关心内部中间变量，符合信息隐藏原则。
 "这里用了两层配置类的继承。IndexConfiguration 管检索相关配置，Configuration 继承它并追加 LLM 相关配置。from_runnable_config 用 dataclasses.fields() 做反射，只提取当前类声明的字段，避免传入多余参数报错
 
-4.23
-cluade辅助理解：
+# 4.23学习记录
+
+## 第一步：cluade辅助理解：
 1.graph.py线性管道，三个节点，无分支
 messages
 generate_query 生成query 唯一有业务判断的节点，用伦茨决定LLM是否介入
@@ -115,34 +116,35 @@ graph.py → utils.py
 retrieval.py → configuration.py
 configuration.py → prompts.py
 
-第二步 加FAISS：
+## 第二步 加FAISS：
+
 改进具体做法：
 1.修改configuration.py
 2.修改retrieval.py ，新增 make_faiss_retriever
 3.在 make_retriever 的 match 里加 case "faiss"
 4.pyproject.toml 加依赖
 5.创建 docs/ 目录和测试文档
-1.
-# 改动前
+### 1.
+改动前
 Literal["elastic", "elastic-local", "pinecone", "mongodb"]
 default="elastic"
 
-# 改动后
+改动后
 Literal["elastic", "elastic-local", "pinecone", "mongodb", "faiss"]
 default="faiss"
 
-2.
+### 2.
 make_elastic_retriever()  ← 原有
 make_pinecone_retriever() ← 原有
 make_mongodb_retriever()  ← 原有
 make_faiss_retriever()    ← 新增
 make_retriever()          ← 原有，加了一行 case "faiss"
 
-3.
+### 3.
 "langchain-community>=0.2.0",   ← FAISS 和 TextLoader 的依赖包
 "faiss-cpu>=1.7.4",             ← Facebook FAISS 本体
 
-4.
+### 4.
 原有后端的依赖链：
 你的代码 → LangChain → Elasticsearch SDK → Elasticsearch Server → 云账号 → API Key
 
@@ -151,4 +153,23 @@ FAISS 的依赖链：
                      → OpenAI SDK → OpenAI API
 
 
-第三步：trace
+## 第三步：trace
+langSmith，接入api
+1.检查langSmith接入
+2.启动开发服务器
+uv run langgraph dev
+相当于启动了一个本地 API 服务器（跑在 localhost:2024）
+3.触发一次调用
+curl -s -X POST http://localhost:2024/runs/stream \
+  -H "Content-Type: application/json" \
+  -d '{
+    "assistant_id": "retrieval_graph",
+    "input": {
+      "messages": [{"role": "user", "content": "What is LangGraph?"}]
+    },
+    "config": {
+      "configurable": {"user_id": "local"}
+    }
+  }' | head -20
+
+  4.观察结果

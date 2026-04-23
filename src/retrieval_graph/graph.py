@@ -50,7 +50,19 @@ async def generate_query(
         - If there's only one message (first user input), it uses that as the query.
         - For subsequent messages, it uses a language model to generate a refined query.
         - The function uses the configuration to set up the prompt and model for query generation.
+    
+    
     """
+    """"真正的职责： 把「用户的自然语言意图」翻译成「向量库检索友好的 query」。
+
+设计边界（重要）：
+
+它只负责生成 query，不负责检索。这是职责单一原则。
+它对外部系统（向量库）一无所知，只和 LLM 打交道。
+第一轮不调 LLM 是个性能优化，但也是个设计妥协——第一轮的用户输入未必是好的检索 query。
+"""
+
+   
     messages = state.messages
     if len(messages) == 1:
         # It's the first user question. We will use the input directly to search.
@@ -82,7 +94,14 @@ async def generate_query(
             "queries": [generated.query],
         }
 
+"""
+真正的职责： 把 query 映射到向量空间，找最近邻文档，返回 top-k 结果。
 
+设计边界：
+
+它只取 queries[-1]，也就是只用最新一条 query。历史 query 存在 state 里但这个节点从来不用。
+它不判断检索结果是否相关，检索到什么就返回什么。
+它不知道用户在问什么，只负责"按 query 找文档"。"""
 async def retrieve(
     state: State, *, config: RunnableConfig
 ) -> dict[str, list[Document]]:
@@ -104,7 +123,11 @@ async def retrieve(
         response = await retriever.ainvoke(state.queries[-1], config)
         return {"retrieved_docs": response}
 
+"""设计边界：
 
+它同时读了两个 state 字段：messages（对话历史）和 retrieved_docs（检索结果）。这是整个 graph 里唯一一个需要「多字段联合」的节点。
+它不知道检索质量如何，无论 retrieved_docs 是高质量文档还是垃圾，都直接喂给 LLM。
+返回的 {"messages": [response]} 会被 add_messages 追加进对话历史，形成多轮对话的上下文。"""
 async def respond(
     state: State, *, config: RunnableConfig
 ) -> dict[str, list[BaseMessage]]:

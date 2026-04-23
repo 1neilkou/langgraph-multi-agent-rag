@@ -29,7 +29,7 @@ from langgraph.graph import add_messages
 
 ############################  Doc Indexing State  #############################
 
-
+#更新方式：支持增删改，可接受str dict document
 def reduce_docs(
     existing: Sequence[Document] | None,
     new: Union[
@@ -133,7 +133,7 @@ class InputState:
 
 # This is the primary state of your agent, where you can store any information
 
-
+#更新方式：纯追加不覆盖
 def add_queries(existing: Sequence[str], new: Sequence[str]) -> Sequence[str]:
     """Combine existing queries with new queries.
 
@@ -143,7 +143,7 @@ def add_queries(existing: Sequence[str], new: Sequence[str]) -> Sequence[str]:
 
     Returns:
         Sequence[str]: A new list containing all queries from both input sequences.
-    """
+    """ 
     return list(existing) + list(new)
 
 
