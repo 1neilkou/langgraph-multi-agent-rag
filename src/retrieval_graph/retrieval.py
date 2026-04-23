@@ -105,6 +105,48 @@ def make_mongodb_retriever(
 
 
 @contextmanager
+def make_faiss_retriever(
+    configuration: IndexConfiguration, embedding_model: Embeddings
+) -> Generator[VectorStoreRetriever, None, None]:
+    """Configure a local FAISS retriever loaded from the docs/ directory.
+
+    Loads all .txt files found under docs/. If the directory is missing or
+    empty, falls back to a single placeholder document so the graph can still
+    run without crashing.
+
+    Note: FAISS does not support per-user filtering. All users share the same
+    local document index. Pass any non-empty string as user_id (e.g. "local").
+    """
+    import pathlib
+
+    from langchain_community.document_loaders import TextLoader
+    from langchain_community.vectorstores import FAISS
+    from langchain_core.documents import Document
+
+    docs_path = pathlib.Path("docs")
+    documents: list[Document] = []
+
+    if docs_path.exists():
+        for txt_file in sorted(docs_path.glob("*.txt")):
+            loader = TextLoader(str(txt_file), encoding="utf-8")
+            documents.extend(loader.load())
+
+    if not documents:
+        documents = [
+            Document(
+                page_content=(
+                    "No documents indexed. "
+                    "Add .txt files to the docs/ directory and restart."
+                ),
+                metadata={"source": "placeholder"},
+            )
+        ]
+
+    vstore = FAISS.from_documents(documents, embedding_model)
+    yield vstore.as_retriever(search_kwargs=configuration.search_kwargs)
+
+
+@contextmanager
 def make_retriever(
     config: RunnableConfig,
 ) -> Generator[VectorStoreRetriever, None, None]:
@@ -125,6 +167,10 @@ def make_retriever(
 
         case "mongodb":
             with make_mongodb_retriever(configuration, embedding_model) as retriever:
+                yield retriever
+
+        case "faiss":
+            with make_faiss_retriever(configuration, embedding_model) as retriever:
                 yield retriever
 
         case _:
