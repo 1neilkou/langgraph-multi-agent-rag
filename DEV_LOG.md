@@ -55,7 +55,7 @@ OPENAI_API_KEY=你的key
 LANGSMITH_PROJECT=langgraph-multi-agent-rag
 
 第二步：
-让claude code协助学习修改
+
 先初始化git仓库，提交第一次仓库：init: copy langgraph template as base
 feat: prepare project for faiss migration
 feat: add faiss retriever support
@@ -65,3 +65,90 @@ git add把改动放进准备提交区
 git commit生成一个版本快照
 git state看现在改了什么
 git log 看历史提交
+
+第三步：
+让claude code协助学习修改
+学习：
+1.graph.py 的执行流程
+这是一个 pipeline 式的 RAG 图，没有循环也没有条件分支，属于最简单的 DAG 结构。generate_query 是唯一有业务判断的节点，用轮次来决定是否需要 LLM 介入。
+2.
+InputState 是对外的窄接口，State 是内部完整状态。这种设计的好处是：外部调用者只需要传 messages，不需要关心内部中间变量，符合信息隐藏原则。
+"这里用了两层配置类的继承。IndexConfiguration 管检索相关配置，Configuration 继承它并追加 LLM 相关配置。from_runnable_config 用 dataclasses.fields() 做反射，只提取当前类声明的字段，避免传入多余参数报错
+
+4.23
+cluade辅助理解：
+1.graph.py线性管道，三个节点，无分支
+messages
+generate_query 生成query 唯一有业务判断的节点，用伦茨决定LLM是否介入
+retrieve
+respond
+messages 追加AI回复
+
+2.state.py的状态字段含义
+IndexState   ← 只用于写入流程
+InputState   ← 对外接口（只暴露 messages）
+State        ← 继承 InputState，内部完整状态（加了 queries + retrieved_docs）
+
+3.configuration.py
+IndexConfiguration（基础：user_id、embedding_model、retriever_provider、search_kwargs）
+    └── Configuration（继承，追加：response_model、query_model、两个 system prompt）
+
+4.retrieal.py
+with retrieval.make_retriever(config) as retriever:
+    response = await retriever.ainvoke(...)
+
+为什么用 contextmanager？ 向量库连接是外部资源，如果不显式关闭会泄漏连接。contextmanager 保证"用完必还"，不管中间是否出错。
+
+总结
+graph.py        ← 编排层：定义"做什么"和"按什么顺序做"
+state.py        ← 数据层：定义节点之间传什么、怎么合并
+configuration.py← 配置层：运行时参数，决定用哪些模型和后端
+retrieval.py    ← 基础设施层：连接外部向量数据库，屏蔽差异
+prompts.py      ← 内容层：LLM 的指令模板
+utils.py        ← 工具层：通用辅助函数，无业务逻辑
+
+依赖方向
+graph.py → state.py
+graph.py → configuration.py
+graph.py → retrieval.py
+graph.py → utils.py
+retrieval.py → configuration.py
+configuration.py → prompts.py
+
+第二步 加FAISS：
+改进具体做法：
+1.修改configuration.py
+2.修改retrieval.py ，新增 make_faiss_retriever
+3.在 make_retriever 的 match 里加 case "faiss"
+4.pyproject.toml 加依赖
+5.创建 docs/ 目录和测试文档
+1.
+# 改动前
+Literal["elastic", "elastic-local", "pinecone", "mongodb"]
+default="elastic"
+
+# 改动后
+Literal["elastic", "elastic-local", "pinecone", "mongodb", "faiss"]
+default="faiss"
+
+2.
+make_elastic_retriever()  ← 原有
+make_pinecone_retriever() ← 原有
+make_mongodb_retriever()  ← 原有
+make_faiss_retriever()    ← 新增
+make_retriever()          ← 原有，加了一行 case "faiss"
+
+3.
+"langchain-community>=0.2.0",   ← FAISS 和 TextLoader 的依赖包
+"faiss-cpu>=1.7.4",             ← Facebook FAISS 本体
+
+4.
+原有后端的依赖链：
+你的代码 → LangChain → Elasticsearch SDK → Elasticsearch Server → 云账号 → API Key
+
+FAISS 的依赖链：
+你的代码 → LangChain → faiss-cpu → 内存
+                     → OpenAI SDK → OpenAI API
+
+
+第三步：trace
