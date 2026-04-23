@@ -1,0 +1,22 @@
+LangGraph is a library for building stateful, multi-actor applications with large language models (LLMs). It is built on top of LangChain and designed for creating agent and multi-agent workflows.
+
+Core concepts in LangGraph:
+
+State: A shared data structure that represents the current snapshot of your application. Every node in the graph reads from and writes to this state. State fields can be annotated with reducer functions that control how values are merged when multiple nodes write to the same field simultaneously.
+
+Node: A Python function (synchronous or asynchronous) that takes the current state and returns a dictionary of updates. Nodes represent the individual computation steps in your workflow, such as calling an LLM, running a retrieval query, or making an API call.
+
+Edge: A connection between nodes that defines the execution order. LangGraph supports two kinds of edges: normal edges (fixed order) and conditional edges (dynamic routing based on the current state). Conditional edges are what transform a linear pipeline into a true agent with decision-making capability.
+
+Graph: The compiled execution engine. When you call builder.compile(), LangGraph validates the graph structure and produces a runnable object that can be invoked, streamed, or deployed as a service.
+
+Retrieval-Augmented Generation (RAG) is a technique for grounding LLM responses in external knowledge. Instead of relying solely on the model's training data, a RAG system retrieves relevant documents from a vector database and includes them in the prompt context before generating an answer.
+
+The typical RAG pipeline has three stages:
+1. Query generation: Transform the user's question into a search-friendly query. For complex questions, this may involve decomposing the question into multiple sub-queries.
+2. Retrieval: Embed the query using a text embedding model and search a vector store for the nearest neighbor documents. Common vector stores include FAISS (local, in-memory), Elasticsearch, Pinecone, and MongoDB Atlas.
+3. Response generation: Combine the retrieved documents with the conversation history and send everything to a large language model to generate a final answer.
+
+FAISS (Facebook AI Similarity Search) is an open-source library for efficient similarity search and clustering of dense vectors. It operates entirely in memory, making it ideal for local development and experimentation without requiring any cloud infrastructure or API keys beyond the embedding model itself.
+
+A multi-agent RAG system extends the basic pipeline with specialized agents: a Planner that decides how to decompose complex questions, a Retriever that fetches evidence, a Critic that evaluates whether the retrieved evidence is sufficient, and a Synthesizer that combines everything into a coherent answer. LangGraph's conditional edges and cycle support make it straightforward to implement the retry loops that such a system requires.
