@@ -1,10 +1,10 @@
-# This workflow will run integration tests for the current project once per day
+# Integration tests require real API keys (ANTHROPIC_API_KEY, OPENAI_API_KEY,
+# LANGSMITH_API_KEY). Run manually via workflow_dispatch when secrets are
+# confirmed to be set. Scheduled runs are disabled to avoid daily failure emails.
 
 name: Integration Tests
 
 on:
-  schedule:
-    - cron: "37 14 * * *" # Run at 7:37 AM Pacific Time (14:37 UTC) every day
   workflow_dispatch: # Allows triggering the workflow manually in GitHub UI
 
 permissions:
@@ -42,7 +42,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
